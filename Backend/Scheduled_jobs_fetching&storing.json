@@ -1,0 +1,610 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "53cdc6af-b297-42fe-8cc0-c707f775889a",
+      "name": "Schedule Trigger - 9 AM Daily1",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1024,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs",
+        "options": {}
+      },
+      "id": "a6a3bde1-e99f-4343-abce-b29fbc89237b",
+      "name": "Fetch Remotive Jobs1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -768,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize jobs from different APIs into unified format\nconst normalizedJobs = [];\n\nfor (const item of $input.all()) {\n  const source = item.json.source || 'unknown';\n  let jobs = [];\n  \n  // Parse Remotive format\n  if (source.includes('remotive') || item.json.jobs) {\n    jobs = item.json.jobs || [];\n    for (const job of jobs) {\n      normalizedJobs.push({\n        job_id: `remotive_${job.id}`,\n        title: job.title,\n        company: job.company_name,\n        location: job.candidate_required_location || 'Remote',\n        job_type: job.job_type || 'Full-time',\n        description: job.description?.replace(/<[^>]*>?/gm, '').replace(/\\s+/g, ' ').trim(),\n        url: job.url,\n        skills_required: job.tags?.join(', ') || '',\n        posted_date: job.publication_date,\n        salary: job.salary || 'Not specified',\n        source_api: 'Remotive',\n        fetched_at: new Date().toISOString()\n      });\n    }\n  }\n  \n  // Parse Arbeitnow format\n  else if (source.includes('arbeitnow') || item.json.data) {\n    jobs = item.json.data || [];\n    for (const job of jobs) {\n      normalizedJobs.push({\n        job_id: `arbeitnow_${job.slug}`,\n        title: job.title,\n        company: job.company_name,\n        location: job.location,\n        job_type: job.job_types?.[0] || 'Full-time',\n        description: job.description,\n        url: job.url,\n        skills_required: job.tags?.join(', ') || '',\n        posted_date: job.created_at,\n        salary: 'Not specified',\n        source_api: 'Arbeitnow',\n        fetched_at: new Date().toISOString()\n      });\n    }\n  }\n  \n  // Parse Findwork format\n  else if (source.includes('findwork') || item.json.results) {\n    jobs = item.json.results || [];\n    for (const job of jobs) {\n      normalizedJobs.push({\n        job_id: `findwork_${job.id}`,\n        title: job.role,\n        company: job.company_name,\n        location: job.location || 'Remote',\n        job_type: job.employment_type || 'Full-time',\n        description: job.text,\n        url: job.url,\n        skills_required: job.keywords?.join(', ') || '',\n        posted_date: job.date_posted,\n        salary: 'Not specified',\n        source_api: 'Findwork',\n        fetched_at: new Date().toISOString()\n      });\n    }\n  }\n  \n  // Parse JSearch format\n  else if (source.includes('jsearch') || item.json.data) {\n    jobs = item.json.data || [];\n    for (const job of jobs) {\n      normalizedJobs.push({\n        job_id: `jsearch_${job.job_id}`,\n        title: job.job_title,\n        company: job.employer_name,\n        location: job.job_city || job.job_country || 'Remote',\n        job_type: job.job_employment_type || 'Full-time',\n        description: job.job_description,\n        url: job.job_apply_link,\n        skills_required: job.job_required_skills?.join(', ') || '',\n        posted_date: job.job_posted_at_datetime_utc,\n        salary: job.job_salary || 'Not specified',\n        source_api: 'JSearch',\n        fetched_at: new Date().toISOString()\n      });\n    }\n  }\n}\n\nreturn normalizedJobs.map(job => ({ json: job }));"
+      },
+      "id": "4455a3c9-00e5-43c8-94d7-663573994d0b",
+      "name": "Normalize Job Data1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE",
+          "mode": "list",
+          "cachedResultName": "JobsData",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1586739360,
+          "mode": "list",
+          "cachedResultName": "Finalized",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE/edit#gid=1586739360"
+        },
+        "options": {}
+      },
+      "id": "e8ec4ad0-175b-466e-b2c7-fa56f86cb64d",
+      "name": "Read Existing Jobs from Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        -240,
+        -48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GVtUzNYbFXZzGsDZ",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE",
+          "mode": "list",
+          "cachedResultName": "applicationsData",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1586739360,
+          "mode": "list",
+          "cachedResultName": "Finalized",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1RsxdfxfE7OToM-SDe9e2tcMob2O7TZOTkAZRLRVYbmE/edit#gid=1586739360"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "job_id ": "={{ $json.job_id }}",
+            "title ": "={{ $json.title }}",
+            "company ": "={{ $json.company }}",
+            "location ": "={{ $json.location }}",
+            "job_type ": "={{ $json.job_type }}",
+            "description ": "={{ $json.description }}",
+            "url ": "={{ $json.url }}",
+            "skills_required ": "={{ $json.skills_required }}",
+            "posted_date ": "={{ $json.posted_date }}",
+            "salary ": "={{ $json.salary }}",
+            "source_api ": "={{ $json.source_api }}",
+            "fetched_at": "={{ $json.fetched_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "job_id ",
+              "displayName": "job_id ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title ",
+              "displayName": "title ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company ",
+              "displayName": "company ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "location ",
+              "displayName": "location ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "job_type ",
+              "displayName": "job_type ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "description ",
+              "displayName": "description ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "url ",
+              "displayName": "url ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "skills_required ",
+              "displayName": "skills_required ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "posted_date ",
+              "displayName": "posted_date ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "salary ",
+              "displayName": "salary ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source_api ",
+              "displayName": "source_api ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fetched_at",
+              "displayName": "fetched_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e4ec99cd-ab78-4611-ac16-d7982c0de803",
+      "name": "Append New Jobs to Sheet1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [
+        432,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GVtUzNYbFXZzGsDZ",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Summary of job collection\nconst totalJobs = $input.all().length;\n\nreturn [{\n  json: {\n    message: `Successfully collected ${totalJobs} new jobs`,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "8373df2d-3064-42fd-a732-f580cc3c7eae",
+      "name": "Success Summary1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Efficient duplicate removal using job_id\n// Handles merged data from: existing sheet jobs + new API jobs\n\nconst allItems = $input.all();\n\nconsole.log(`Total items received from merge: ${allItems.length}`);\n\n// Separate existing jobs (from sheet) and new jobs (from API)\nconst existingJobs = [];\nconst newJobs = [];\n\nallItems.forEach(item => {\n  const json = item.json;\n  \n  // Jobs from sheet have row_number, new jobs from API don't\n  if (json.row_number !== undefined && json.row_number !== null) {\n    existingJobs.push(item);\n  } else {\n    newJobs.push(item);\n  }\n});\n\nconsole.log(`Existing jobs from sheet: ${existingJobs.length}`);\nconsole.log(`New jobs from API: ${newJobs.length}`);\n\n// Build Set of existing job IDs for O(1) lookup\n// Note: Handle both \"job_id\" and \"job_id \" (with space) from sheet\nconst existingJobIds = new Set();\nexistingJobs.forEach(item => {\n  const jobId = item.json.job_id || item.json[\"job_id \"];\n  if (jobId) {\n    existingJobIds.add(String(jobId).trim()); // Normalize to string and trim\n  }\n});\n\nconsole.log(`Unique existing job IDs: ${existingJobIds.size}`);\n\n// Filter new jobs: only keep those NOT in existing IDs\n// Also prevent duplicates within the new batch itself\nconst seenNewIds = new Set();\nconst uniqueNewJobs = [];\n\nnewJobs.forEach(item => {\n  const jobId = item.json.job_id || item.json[\"job_id \"];\n  \n  if (!jobId) {\n    console.log('Warning: Job without ID found, skipping');\n    return;\n  }\n  \n  const normalizedId = String(jobId).trim();\n  \n  // Check if this job_id exists in sheet OR already seen in this batch\n  if (!existingJobIds.has(normalizedId) && !seenNewIds.has(normalizedId)) {\n    uniqueNewJobs.push(item);\n    seenNewIds.add(normalizedId); // Mark as seen to prevent duplicates in batch\n  }\n});\n\nconsole.log(`Unique new jobs to add: ${uniqueNewJobs.length}`);\nconsole.log(`Duplicates removed: ${newJobs.length - uniqueNewJobs.length}`);\n\n// If no unique jobs, return empty array with a message\nif (uniqueNewJobs.length === 0) {\n  console.log('No new unique jobs found. All jobs already exist in sheet.');\n  return [];\n}\n\nreturn uniqueNewJobs;"
+      },
+      "id": "e9d824e0-6e83-427e-9f55-7acb29f8f270",
+      "name": "Remove Duplicates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -16,
+        128
+      ],
+      "id": "6b041e70-cf62-4743-bc5a-364d31bfe4ee",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "job-storing",
+          "mode": "list",
+          "cachedResultName": "job-storing"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1456,
+        128
+      ],
+      "id": "ea8291de-7b7b-45e8-8c4d-e193c69ee0fa",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "EKfEZzF1pEyTrV3G",
+          "name": "PineconeApi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        400
+      ],
+      "id": "cd17b0bb-2bdd-4680-afaf-093282365515",
+      "name": "Embeddings Google Gemini2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PewXyZpGGbVN8fCf",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst preparedJobs = items.map(item => {\n    const json = item.json;\n\n    // Extract fields\n    const jobId = (json.job_id || json[\"job_id \"] || '').toString().trim();\n    const title = (json.title || json[\"title \"] || '').toString().trim();\n    const company = (json.company || json[\"company \"] || '').toString().trim();\n    const location = (json.location || json[\"location \"] || '').toString().trim();\n    const jobType = (json.job_type || json[\"job_type \"] || '').toString().trim();\n    const description = (json.description || json[\"description \"] || '').toString().trim();\n    const skillsRequired = (json.skills_required || json[\"skills_required \"] || '').toString().trim();\n    const salary = (json.salary || json[\"salary \"] || '').toString().trim();\n    const url = (json.url || json[\"url \"] || '').toString().trim();\n    const postedDate = (json.posted_date || json[\"posted_date \"] || '').toString().trim();\n    const sourceApi = (json.source_api || json[\"source_api \"] || '').toString().trim();\n\n    // Give AI the FULL description (no truncation)\n    const inputForAI = `\nJob ID: ${jobId}\nTitle: ${title}\nCompany: ${company}\nLocation: ${location}\nJob Type: ${jobType}\nSkills Required: ${skillsRequired}\nSalary: ${salary}\nPosted Date: ${postedDate}\n\nFULL JOB DESCRIPTION:\n${description}\n    `.trim();\n\n    return {\n        json: {\n            input_text: inputForAI,\n            metadata: {\n                job_id: jobId,\n                title: title,\n                company: company,\n                location: location,\n                job_type: jobType,\n                skills_required: skillsRequired,\n                salary: salary,\n                url: url,\n                posted_date: postedDate,\n                source_api: sourceApi,\n                full_description: description,\n                indexed_at: new Date().toISOString()\n            }\n        }\n    };\n});\n\nreturn preparedJobs;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        128
+      ],
+      "id": "e14d1ade-06d7-4391-990f-5af577bb13e8",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "job_id",
+                "value": "=={{ $json.metadata.job_id }}"
+              },
+              {
+                "name": "title",
+                "value": "=={{ $json.metadata.title }}"
+              },
+              {
+                "name": "company",
+                "value": "=={{ $json.metadata.company }}"
+              },
+              {
+                "name": "location",
+                "value": "=={{ $json.metadata.location }}"
+              },
+              {
+                "name": "job_type",
+                "value": "=={{ $json.metadata.job_type }}"
+              },
+              {
+                "name": "skills_required",
+                "value": "=={{ $json.metadata.skills_required }}"
+              },
+              {
+                "name": "salary",
+                "value": "=={{ $json.metadata.salary }}"
+              },
+              {
+                "name": "url",
+                "value": "=={{ $json.metadata.url }}\n"
+              },
+              {
+                "name": "full_description",
+                "value": "=={{ $json.metadata.full_description }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        416
+      ],
+      "id": "5d61f942-31c6-42b7-bc70-baa7b22a305f",
+      "name": "Default Data Loader1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a job posting summarizer. Create a concise summary for vector search.\n\nThis is the Job datails:{{ $json.input_text }}\n\nIMPORTANT: Output ONLY the formatted text below. No additional commentary.\n\nFormat (keep under 900 - 990 characters total) find these things in the provided job details:\nJobID: [Exact job id for each job from metadata]\nTitle: [exact job title]\nLocation: [location]\nType: [job type - Full-time/Part-time/Contract]\nSkills: [list ALL technical skills, tools, and technologies - do NOT abbreviate or summarize]\nSalary: [salary range or \"Not specified\"]\n\nKey Requirements:\n- [Most critical requirement 1]\n- [Most critical requirement 2]\n- [Most critical requirement 3]\n- [Most critical requirement 4 if space allows]\nAlso write summary of the requirement and qualififcation from description. In description must add that thing that is highlighted or asked multiple times, specially in skills/expereince\n\nFocus on:\n- Technical skills (programming languages, frameworks, tools)\n- Years of experience required\n- Key qualifications and certifications\n- Critical responsibilities\n\nExclude:\n- Company marketing language\n- Generic \"team player\" phrases\n- Benefits and perks\n- Application instructions ",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        128
+      ],
+      "id": "d8c72011-16ea-49e7-a0f7-66aeb29e47a6",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        768,
+        400
+      ],
+      "id": "302793c0-928f-4efc-ae9f-95b1f9b593ba",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "8NCktgDnefbnGaCA",
+          "name": "Aslam api"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst originalData = $('Code in JavaScript2').all();\n\nconsole.log(`[Code JS3] Processing ${items.length} jobs from AI Agent`);\nconsole.log(`[Code JS3] Original data count: ${originalData.length}`);\n\n// CRITICAL: Items from AI Agent and Code in JavaScript2 maintain the SAME ORDER\n// So we can use simple index-based matching\nconst formattedJobs = items.map((item, index) => {\n    // Get AI summary from agent output\n    const aiSummary = item.json.output || item.json.text || '';\n    \n    console.log(`[Code JS3] Processing job ${index}`);\n    console.log(`[Code JS3] AI Summary preview: ${aiSummary.substring(0, 100)}...`);\n    \n    // Get metadata from the SAME index in original data\n    // This is reliable because n8n processes items in order\n    const originalItem = originalData[index];\n    \n    if (!originalItem || !originalItem.json.metadata) {\n        console.log(`[Code JS3] ERROR: No metadata at index ${index}`);\n        throw new Error(`Missing metadata for job at index ${index}`);\n    }\n    \n    const meta = originalItem.json.metadata;\n    console.log(`[Code JS3] Using metadata for job_id: ${meta.job_id} - ${meta.title}`);\n    \n    // Prepare text for embedding (limit to 900 chars)\n    // Use AI summary which contains structured job info\n    const textForEmbedding = aiSummary.substring(0, 900);\n    \n    // Convert to binary\n    const buffer = Buffer.from(textForEmbedding, 'utf8');\n    const base64Data = buffer.toString('base64');\n    \n    console.log(`[Code JS3] ✓ Job ${index}: ${meta.job_id} - ${meta.title} matched with summary`);\n    \n    return {\n        json: {\n            metadata: {\n                job_id: meta.job_id,\n                title: meta.title,\n                company: meta.company,\n                location: meta.location,\n                job_type: meta.job_type,\n                skills_required: meta.skills_required,\n                salary: meta.salary,\n                url: meta.url,\n                posted_date: meta.posted_date,\n                source_api: meta.source_api,\n                full_description: meta.full_description,\n                indexed_at: meta.indexed_at\n            }\n        },\n        binary: {\n            data: {\n                data: base64Data,\n                mimeType: 'text/plain'\n            }\n        }\n    };\n});\n\nconsole.log(`[Code JS3] ✓ Successfully formatted ${formattedJobs.length} jobs with correct metadata`);\nreturn formattedJobs;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        128
+      ],
+      "id": "2f9a143b-801c-4534-8d78-c6859c9c23bd",
+      "name": "Code in JavaScript3"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger - 9 AM Daily1": {
+      "main": [
+        [
+          {
+            "node": "Fetch Remotive Jobs1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Remotive Jobs1": {
+      "main": [
+        [
+          {
+            "node": "Normalize Job Data1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Job Data1": {
+      "main": [
+        [
+          {
+            "node": "Read Existing Jobs from Sheet1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Read Existing Jobs from Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append New Jobs to Sheet1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Append New Jobs to Sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store1": {
+      "main": [
+        [
+          {
+            "node": "Success Summary1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Google Gemini2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "9b0a66a09f6c1c2b58f524093f19379af052505253b4fc77ab4ed7345c4a792a"
+  }
+}
