@@ -1,6 +1,6 @@
 import { Job } from '@/types/job';
 
-const N8N_WEBHOOK_URL = 'http://localhost:5678/webhook-test/match-resume';
+const N8N_WEBHOOK_URL = 'https://5ib0bo45.rcld.app/webhook/match-resume';
 
 // Clean up Google Sheets exported data (removes '= prefix and trims)
 function cleanSheetValue(value: any): any {
