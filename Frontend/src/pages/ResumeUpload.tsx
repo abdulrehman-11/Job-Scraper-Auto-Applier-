@@ -64,7 +64,13 @@ const ResumeUpload = () => {
       
       // Save resume to local storage
       const fileUrl = URL.createObjectURL(file);
-      const savedResume = saveResume(file.name, fileUrl);
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const savedResume = saveResume(file.name, fileUrl, fileBase64);
       
       // Save matched jobs with resume ID
       saveMatchedJobs(jobs, savedResume.id);
@@ -84,10 +90,35 @@ const ResumeUpload = () => {
     }
   };
 
-  const handleSelectSavedResume = (resumeFile: string) => {
-    toast.info('Using saved resume...');
-    // In a real app, you would re-process this resume
-    navigate('/dashboard/resumes');
+  const handleSelectSavedResume = async (resumeId: string) => {
+    const resume = savedResumes.find(r => r.id === resumeId);
+    if (!resume) return;
+    try {
+      setIsUploading(true);
+      navigate('/processing');
+      let fileToProcess: File | null = null;
+      if (resume.fileBase64) {
+        const res = await fetch(resume.fileBase64);
+        const blob = await res.blob();
+        fileToProcess = new File([blob], resume.filename, { type: 'application/pdf' });
+      } else if (resume.fileUrl) {
+        const res = await fetch(resume.fileUrl);
+        const blob = await res.blob();
+        fileToProcess = new File([blob], resume.filename, { type: 'application/pdf' });
+      }
+      if (!fileToProcess) throw new Error('Could not load saved resume');
+      const jobs = await uploadResumeAndMatchJobs(fileToProcess);
+      saveMatchedJobs(jobs, resume.id);
+      toast.success(`Found ${jobs.length} matching jobs!`);
+      setTimeout(() => {
+        navigate('/dashboard/resumes');
+      }, 1200);
+    } catch (e) {
+      navigate('/resume-upload');
+      toast.error('Failed to re-process saved resume.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -112,7 +143,7 @@ const ResumeUpload = () => {
                   <div
                     key={resume.id}
                     className="flex items-center justify-between p-3 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
-                    onClick={() => handleSelectSavedResume(resume.fileUrl)}
+                    onClick={() => handleSelectSavedResume(resume.id)}
                   >
                     <div className="flex items-center gap-3">
                       <FileText className="h-5 w-5 text-primary" />

@@ -191,7 +191,7 @@ export function getResumesSortedByLatest(): Array<{
   );
 }
 
-export function saveResume(filename: string, fileUrl: string) {
+export function saveResume(filename: string, fileUrl: string, fileBase64?: string) {
   const resumes = getResumes();
   
   // Check if resume with same filename already exists
@@ -200,6 +200,10 @@ export function saveResume(filename: string, fileUrl: string) {
   if (existingResume) {
     // Update the uploadedAt timestamp for existing resume
     existingResume.uploadedAt = new Date().toISOString();
+    if (fileBase64) {
+      // Update stored content if provided
+      (existingResume as any).fileBase64 = fileBase64;
+    }
     localStorage.setItem('resumes', JSON.stringify(resumes));
     return existingResume;
   }
@@ -210,6 +214,7 @@ export function saveResume(filename: string, fileUrl: string) {
     filename,
     fileUrl,
     uploadedAt: new Date().toISOString(),
+    ...(fileBase64 ? { fileBase64 } : {}),
   };
   resumes.push(newResume);
   localStorage.setItem('resumes', JSON.stringify(resumes));
@@ -221,6 +226,7 @@ export function getResumes(): Array<{
   filename: string;
   fileUrl: string;
   uploadedAt: string;
+  fileBase64?: string;
 }> {
   const stored = localStorage.getItem('resumes');
   return stored ? JSON.parse(stored) : [];

@@ -11,6 +11,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button as UIButton } from '@/components/ui/button';
 
 const ResumeJobs = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
@@ -25,6 +27,8 @@ const ResumeJobs = () => {
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [extractionToDelete, setExtractionToDelete] = useState<{ batchId: string; extractionDate: string; jobCount: number } | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   const handleDeleteExtraction = () => {
     if (!extractionToDelete || !resumeId) return;
@@ -316,7 +320,12 @@ const ResumeJobs = () => {
                   </div>
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {batchJobs.map((job) => (
-                      <JobCard key={`${job.job_id}-${job.batchId}`} job={job} showMatchScore />
+                      <JobCard 
+                        key={`${job.job_id}-${job.batchId}`} 
+                        job={job} 
+                        showMatchScore 
+                        onCardClick={(j) => { setSelectedJob(j); setDetailOpen(true); }}
+                      />
                     ))}
                   </div>
                 </div>
@@ -327,7 +336,12 @@ const ResumeJobs = () => {
         // Simple grid when filtering by single batch
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredJobs.map((job) => (
-            <JobCard key={`${job.job_id}-${job.batchId}`} job={job} showMatchScore />
+            <JobCard 
+              key={`${job.job_id}-${job.batchId}`} 
+              job={job} 
+              showMatchScore 
+              onCardClick={(j) => { setSelectedJob(j); setDetailOpen(true); }}
+            />
           ))}
         </div>
       )}
@@ -357,6 +371,33 @@ const ResumeJobs = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-2xl sm:rounded-xl">
+          {selectedJob && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedJob.title}</DialogTitle>
+                <DialogDescription>
+                  <div className="flex items-center gap-3 text-foreground">
+                    <span className="font-medium">{selectedJob.company}</span>
+                    <span className="text-muted-foreground">• {selectedJob.location}</span>
+                    <span className="text-muted-foreground">• {selectedJob.job_type}</span>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[60vh] overflow-auto pr-2 text-sm leading-6">
+                {selectedJob.description}
+              </div>
+              <div className="pt-2 border-t flex justify-end">
+                <UIButton onClick={() => window.open(selectedJob.url, '_blank')}>
+                  Apply Now
+                </UIButton>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

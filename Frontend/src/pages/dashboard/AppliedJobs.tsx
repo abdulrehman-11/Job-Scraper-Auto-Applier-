@@ -29,10 +29,7 @@ const AppliedJobs = () => {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {appliedJobs.map((job) => (
           <div key={job.job_id} className="relative">
-            <div className="absolute -top-2 -right-2 z-10 bg-accent text-accent-foreground rounded-full p-2 shadow-lg">
-              <CheckCircle className="h-4 w-4" />
-            </div>
-            <JobCard job={job} showMatchScore />
+            <JobCard job={job} showMatchScore appliedMode />
           </div>
         ))}
       </div>

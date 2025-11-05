@@ -9,19 +9,22 @@ import {
   Calendar, 
   Briefcase,
   ExternalLink,
-  TrendingUp,
   Award,
+  CheckCircle,
 } from 'lucide-react';
-import { saveJobToLocalStorage } from '@/lib/api';
+import { saveJobToLocalStorage, getAppliedJobsFromLocalStorage } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface JobCardProps {
   job: Job;
   showMatchScore?: boolean;
+  appliedMode?: boolean;
+  onCardClick?: (job: Job) => void;
 }
 
-export function JobCard({ job, showMatchScore = true }: JobCardProps) {
-  const handleApply = () => {
+export function JobCard({ job, showMatchScore = true, appliedMode = false, onCardClick }: JobCardProps) {
+  const handleApply = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     window.open(job.url, '_blank');
     saveJobToLocalStorage(job);
     toast.success('Job saved to Applied Jobs!');
@@ -39,8 +42,10 @@ export function JobCard({ job, showMatchScore = true }: JobCardProps) {
     return 'outline';
   };
 
+  const isAlreadyApplied = getAppliedJobsFromLocalStorage().some(j => j.job_id === job.job_id);
+
   return (
-    <Card className="group hover:shadow-card-hover transition-all duration-300 animate-fade-in">
+    <Card className="group hover:shadow-card-hover transition-all duration-300 animate-fade-in cursor-pointer" onClick={() => onCardClick?.(job)}>
       <CardHeader className="space-y-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -52,7 +57,13 @@ export function JobCard({ job, showMatchScore = true }: JobCardProps) {
               <span className="font-medium">{job.company}</span>
             </div>
           </div>
-          
+          {(appliedMode || isAlreadyApplied) && (
+            <div className="flex items-center gap-1">
+              <div className="bg-accent text-accent-foreground rounded-full p-2 shadow-lg">
+                <CheckCircle className="h-4 w-4" />
+              </div>
+            </div>
+          )}
           {showMatchScore && job.hybridScore !== undefined && (
             <div className="flex flex-col items-end gap-1">
               <Badge variant={getScoreBadgeVariant(job.hybridScore)} className="text-sm">
@@ -93,52 +104,26 @@ export function JobCard({ job, showMatchScore = true }: JobCardProps) {
           {job.description}
         </p>
 
-        {showMatchScore && (
+        {showMatchScore && job.matchedSkills && job.matchedSkills.length > 0 && (
           <div className="space-y-3 pt-2 border-t">
-            {job.matchedSkills && job.matchedSkills.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Award className="h-4 w-4 text-accent" />
-                  <span className="text-sm font-medium">
-                    Matched Skills ({job.matchedSkillsCount})
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {job.matchedSkills.slice(0, 6).map((skill, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                  {job.matchedSkills.length > 6 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{job.matchedSkills.length - 6} more
-                    </Badge>
-                  )}
-                </div>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Award className="h-4 w-4 text-accent" />
+                <span className="text-sm font-medium">
+                  Matched Skills ({job.matchedSkillsCount})
+                </span>
               </div>
-            )}
-            
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <div className="text-center p-2 rounded bg-primary-light">
-                <TrendingUp className="h-3 w-3 mx-auto mb-1 text-primary" />
-                <div className="font-semibold text-primary">
-                  {job.semanticScore?.toFixed(0)}%
-                </div>
-                <div className="text-muted-foreground">Semantic</div>
-              </div>
-              <div className="text-center p-2 rounded bg-primary-light">
-                <Award className="h-3 w-3 mx-auto mb-1 text-primary" />
-                <div className="font-semibold text-primary">
-                  {job.keywordScore?.toFixed(0)}%
-                </div>
-                <div className="text-muted-foreground">Keywords</div>
-              </div>
-              <div className="text-center p-2 rounded bg-primary-light">
-                <Briefcase className="h-3 w-3 mx-auto mb-1 text-primary" />
-                <div className="font-semibold text-primary">
-                  {job.experienceScore?.toFixed(0)}%
-                </div>
-                <div className="text-muted-foreground">Experience</div>
+              <div className="flex flex-wrap gap-1.5">
+                {job.matchedSkills.slice(0, 6).map((skill, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-xs">
+                    {skill}
+                  </Badge>
+                ))}
+                {job.matchedSkills.length > 6 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{job.matchedSkills.length - 6} more
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -152,13 +137,24 @@ export function JobCard({ job, showMatchScore = true }: JobCardProps) {
       </CardContent>
 
       <CardFooter>
-        <Button 
-          onClick={handleApply}
-          className="w-full group-hover:bg-primary-hover transition-colors"
-        >
-          Apply Now
-          <ExternalLink className="ml-2 h-4 w-4" />
-        </Button>
+        {appliedMode ? (
+          <div className="flex w-full items-center gap-2">
+            <Button disabled className="flex-1">
+              Applied
+            </Button>
+            <Button variant="outline" size="icon" onClick={(e) => handleApply(e)}>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button 
+            onClick={(e) => handleApply(e)}
+            className="w-full group-hover:bg-primary-hover transition-colors"
+          >
+            Apply Now
+            <ExternalLink className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
