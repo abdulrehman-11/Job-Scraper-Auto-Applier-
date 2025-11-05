@@ -1,0 +1,48 @@
+{
+  "scraped_at": "2025-11-05T00:02:21.351789",
+  "total_jobs": 3,
+  "jobs": [
+    {
+      "job_id": "simplyhired_2cff772b00f2",
+      "title": "Python Developer",
+      "company": "Tech Corp",
+      "location": "Remote",
+      "job_type": "Full-time",
+      "description": "We are seeking an experienced Python Developer to join our team. You will work on building scalable web applications using modern frameworks.",
+      "url": "https://www.simplyhired.com/job/xyz123",
+      "skills_required": "Python, Django, Docker, AWS, PostgreSQL",
+      "posted_date": "2025-11-04T10:30:00.000000",
+      "salary": "Not specified",
+      "source_api": "SimplyHired",
+      "fetched_at": "2025-11-04T22:30:00.000000"
+    },
+    {
+      "job_id": "talent_abc456def789",
+      "title": "Machine Learning Engineer",
+      "company": "AI Solutions Inc",
+      "location": "San Francisco, CA",
+      "job_type": "Full-time",
+      "description": "Looking for ML Engineer with experience in PyTorch and TensorFlow. You will develop and deploy ML models at scale.",
+      "url": "https://www.talent.com/view?id=abc456",
+      "skills_required": "Python, Pytorch, Tensorflow, Kubernetes, Machine Learning",
+      "posted_date": "2025-11-03T14:20:00.000000",
+      "salary": "$120,000 - $180,000 per year",
+      "source_api": "Talent.com",
+      "fetched_at": "2025-11-04T22:30:00.000000"
+    },
+    {
+      "job_id": "glassdoor_xyz987wvu654",
+      "title": "Full Stack Developer",
+      "company": "StartUp XYZ",
+      "location": "New York, NY",
+      "job_type": "Full-time",
+      "description": "Join our startup as a Full Stack Developer. Work with React, Node.js, and modern cloud technologies to build innovative products.",
+      "url": "https://www.glassdoor.com/job/123456",
+      "skills_required": "React, Node.Js, Typescript, AWS, Docker, Git",
+      "posted_date": "2025-11-04T08:15:00.000000",
+      "salary": "$100,000 - $140,000",
+      "source_api": "Glassdoor",
+      "fetched_at": "2025-11-04T22:30:00.000000"
+    }
+  ]
+}

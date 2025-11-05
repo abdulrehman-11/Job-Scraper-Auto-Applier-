@@ -1,0 +1,220 @@
+{
+  "name": "Job Scraper API - Example Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "notes": "Runs daily at 9 AM"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_APP_URL.onrender.com/api/scrape-jobs",
+        "options": {
+          "timeout": 600000
+        },
+        "bodyParametersJson": "={\n  \"platform\": \"SimplyHired\",\n  \"keywords\": [\"python developer\", \"data scientist\"],\n  \"pages\": 2,\n  \"location\": \"United States\"\n}"
+      },
+      "name": "HTTP Request - Scrape Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "notes": "Call job scraper API"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "jobs",
+              "value": "={{ $json.jobs }}"
+            },
+            {
+              "name": "total_jobs",
+              "value": "={{ $json.total_jobs }}"
+            },
+            {
+              "name": "success",
+              "value": "={{ $json.success }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "notes": "Process jobs in batches of 10"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process each job\nconst jobs = $input.item.json.jobs;\n\nreturn jobs.map(job => ({\n  json: {\n    job_id: job.job_id,\n    title: job.title,\n    company: job.company,\n    location: job.location,\n    job_type: job.job_type,\n    description: job.description.substring(0, 500), // First 500 chars\n    url: job.url,\n    skills: job.skills_required,\n    posted_date: job.posted_date,\n    salary: job.salary,\n    source: job.source_api,\n    fetched_at: job.fetched_at\n  }\n}));"
+      },
+      "name": "Process Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.job_type }}",
+              "operation": "equals",
+              "value2": "Full-time"
+            }
+          ]
+        }
+      },
+      "name": "Filter - Full-time Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "Only keep full-time jobs"
+    },
+    {
+      "parameters": {
+        "content": "=📢 **New Job Alert!**\n\n**{{ $json.title }}** at **{{ $json.company }}**\n📍 Location: {{ $json.location }}\n💼 Type: {{ $json.job_type }}\n💰 Salary: {{ $json.salary }}\n🏢 Source: {{ $json.source }}\n\n**Skills:** {{ $json.skills }}\n\n🔗 [Apply Now]({{ $json.url }})",
+        "channel": "job-alerts",
+        "options": {}
+      },
+      "name": "Slack - Send Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "notes": "Send to Slack channel",
+      "credentials": {
+        "slackApi": {
+          "id": "1",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "spreadsheetId": "YOUR_SPREADSHEET_ID",
+        "range": "Jobs!A:L",
+        "options": {}
+      },
+      "name": "Google Sheets - Save Job",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [1450, 400],
+      "notes": "Save to spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request - Scrape Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request - Scrape Jobs": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Process Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Jobs": {
+      "main": [
+        [
+          {
+            "node": "Filter - Full-time Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter - Full-time Only": {
+      "main": [
+        [
+          {
+            "node": "Slack - Send Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets - Save Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-11-05T00:00:00.000Z",
+  "versionId": "1"
+}
