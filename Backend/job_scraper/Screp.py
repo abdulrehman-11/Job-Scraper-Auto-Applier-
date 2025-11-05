@@ -1059,12 +1059,12 @@ async def main():
     print(f"🔍 Keywords: {', '.join(SEARCH_KEYWORDS[:3])}...")
     print(f"📍 Location: {LOCATION}\n")
     
-    #print("\n🎯 PHASE 1: SimplyHired")
-    #await scraper.scrape_simplyhired(
-    #    keywords=SEARCH_KEYWORDS[:2],
-    #    location=LOCATION,
-    #    max_pages=5
-    #)
+    print("\n🎯 PHASE 1: SimplyHired")
+    await scraper.scrape_simplyhired(
+        keywords=SEARCH_KEYWORDS[:2],
+        location=LOCATION,
+        max_pages=5
+    )
     
     print("\n🎯 PHASE 2: Talent.com")
     await scraper.scrape_talent(
