@@ -7,7 +7,7 @@ services:
     env: python
     region: oregon  # or your preferred region
     plan: free  # or starter, standard, pro
-    buildCommand: "pip install -r requirement.txt && playwright install --with-deps chromium"
+    buildCommand: "./render-build.sh"
     startCommand: "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 600 --keep-alive 5 --log-level info api:app"
     healthCheckPath: /health
     envVars:
@@ -19,5 +19,7 @@ services:
         value: True
       - key: MAX_PAGES_PER_KEYWORD
         value: 3
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/.cache/ms-playwright
       - key: PORT
         generateValue: true
