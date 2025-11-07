@@ -6,13 +6,16 @@ import {
   Building2, 
   MapPin, 
   DollarSign, 
-  Calendar, 
+  Calendar,
   Briefcase,
   ExternalLink,
   Award,
   CheckCircle,
+  Clock,
+  FileText,
 } from 'lucide-react';
 import { saveJobToLocalStorage, getAppliedJobsFromLocalStorage } from '@/lib/api';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 interface JobCardProps {
@@ -20,13 +23,28 @@ interface JobCardProps {
   showMatchScore?: boolean;
   appliedMode?: boolean;
   onCardClick?: (job: Job) => void;
+  resumeContext?: {
+    resumeId?: string;
+    resumeFilename?: string;
+    batchId?: string;
+    extractionDate?: string;
+  };
+  appliedMetadata?: {
+    appliedAt?: string;
+    resumeName?: string;
+  };
 }
 
-export function JobCard({ job, showMatchScore = true, appliedMode = false, onCardClick }: JobCardProps) {
+export function JobCard({ job, showMatchScore = true, appliedMode = false, onCardClick, resumeContext, appliedMetadata }: JobCardProps) {
   const handleApply = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     window.open(job.url, '_blank');
-    saveJobToLocalStorage(job);
+    saveJobToLocalStorage(job, {
+      resumeId: resumeContext?.resumeId ?? job.resumeId,
+      resumeFilename: resumeContext?.resumeFilename ?? job.resumeFilename,
+      batchId: resumeContext?.batchId ?? job.batchId,
+      extractionDate: resumeContext?.extractionDate ?? job.extractionDate,
+    });
     toast.success('Job saved to Applied Jobs!');
   };
 
@@ -43,6 +61,18 @@ export function JobCard({ job, showMatchScore = true, appliedMode = false, onCar
   };
 
   const isAlreadyApplied = getAppliedJobsFromLocalStorage().some(j => j.job_id === job.job_id);
+
+  const jobWithMeta = job as Job & {
+    appliedAt?: string;
+    resumeFilename?: string;
+  };
+
+  const appliedInfo = appliedMetadata ?? (appliedMode
+    ? {
+        appliedAt: jobWithMeta.appliedAt,
+        resumeName: jobWithMeta.resumeFilename,
+      }
+    : undefined);
 
   return (
     <Card className="group hover:shadow-card-hover transition-all duration-300 animate-fade-in cursor-pointer" onClick={() => onCardClick?.(job)}>
@@ -103,6 +133,23 @@ export function JobCard({ job, showMatchScore = true, appliedMode = false, onCar
         <p className="text-sm text-foreground/80 line-clamp-3">
           {job.description}
         </p>
+
+        {appliedInfo && (appliedInfo.appliedAt || appliedInfo.resumeName) && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-secondary/50 bg-secondary/40 p-3 text-xs text-muted-foreground">
+            {appliedInfo.resumeName && (
+              <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
+                <FileText className="h-3.5 w-3.5 text-primary" />
+                {appliedInfo.resumeName}
+              </span>
+            )}
+            {appliedInfo.appliedAt && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5 text-primary" />
+                Applied {formatDistanceToNow(new Date(appliedInfo.appliedAt), { addSuffix: true })}
+              </span>
+            )}
+          </div>
+        )}
 
         {showMatchScore && job.matchedSkills && job.matchedSkills.length > 0 && (
           <div className="space-y-3 pt-2 border-t">

@@ -31,6 +31,12 @@ export interface Job {
   
   // Ranking
   rank?: number;
+
+  // Local metadata
+  resumeId?: string;
+  resumeFilename?: string;
+  batchId?: string;
+  extractionDate?: string;
 }
 
 export interface Resume {

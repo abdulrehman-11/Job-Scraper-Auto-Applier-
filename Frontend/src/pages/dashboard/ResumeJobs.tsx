@@ -14,6 +14,8 @@ import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button as UIButton } from '@/components/ui/button';
 
+type DateFilterValue = 'all' | '24h' | '3d' | 'older';
+
 const ResumeJobs = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
@@ -29,6 +31,7 @@ const ResumeJobs = () => {
   const [extractionToDelete, setExtractionToDelete] = useState<{ batchId: string; extractionDate: string; jobCount: number } | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
+  const [dateFilters, setDateFilters] = useState<Record<string, DateFilterValue>>({});
 
   const handleDeleteExtraction = () => {
     if (!extractionToDelete || !resumeId) return;
@@ -70,6 +73,13 @@ const ResumeJobs = () => {
     setDeleteDialogOpen(true);
   };
 
+  const handleDateFilterChange = (batchId: string, value: DateFilterValue) => {
+    setDateFilters((prev) => ({
+      ...prev,
+      [batchId]: value,
+    }));
+  };
+
   const resume = resumes.find(r => r.id === resumeId);
   const resumeData = resumeId ? jobsByResume[resumeId] : null;
 
@@ -94,11 +104,17 @@ const ResumeJobs = () => {
     const jobs: any[] = [];
     resumeData.batches.forEach((batch) => {
       batch.jobs.forEach(job => {
-        jobs.push({ ...job, batchId: batch.batchId, extractionDate: batch.extractionDate });
+        jobs.push({
+          ...job,
+          batchId: job.batchId ?? batch.batchId,
+          extractionDate: job.extractionDate ?? batch.extractionDate,
+          resumeId: job.resumeId ?? resume.id,
+          resumeFilename: job.resumeFilename ?? resume.filename,
+        });
       });
     });
     return jobs;
-  }, [resumeData]);
+  }, [resumeData, resume.id, resume.filename]);
 
   // Get unique locations and job types
   const locations = useMemo(() => {
@@ -113,6 +129,7 @@ const ResumeJobs = () => {
 
   // Filter and sort jobs
   const filteredJobs = useMemo(() => {
+    const now = Date.now();
     let filtered = allJobs.filter(job => {
       const matchesSearch = 
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -122,8 +139,27 @@ const ResumeJobs = () => {
       const matchesLocation = locationFilter === 'all' || job.location === locationFilter;
       const matchesJobType = jobTypeFilter === 'all' || job.job_type === jobTypeFilter;
       const matchesBatch = selectedBatch === 'all' || job.batchId === selectedBatch;
+      const dateFilterValue: DateFilterValue = selectedBatch === 'all'
+        ? (dateFilters[job.batchId ?? ''] ?? 'all')
+        : (dateFilters[selectedBatch] ?? 'all');
 
-      return matchesSearch && matchesLocation && matchesJobType && matchesBatch;
+      const matchesDateFilter = (() => {
+        if (dateFilterValue === 'all') return true;
+        if (!job.posted_date) {
+          return dateFilterValue === 'older' ? true : false;
+        }
+        const posted = new Date(job.posted_date);
+        if (Number.isNaN(posted.getTime())) {
+          return dateFilterValue === 'older' ? true : false;
+        }
+        const diffHours = (now - posted.getTime()) / (1000 * 60 * 60);
+        if (dateFilterValue === '24h') return diffHours <= 24;
+        if (dateFilterValue === '3d') return diffHours <= 72;
+        if (dateFilterValue === 'older') return diffHours > 72;
+        return true;
+      })();
+
+      return matchesSearch && matchesLocation && matchesJobType && matchesBatch && matchesDateFilter;
     });
 
     // Sort jobs
@@ -136,7 +172,7 @@ const ResumeJobs = () => {
     }
 
     return filtered;
-  }, [allJobs, searchQuery, locationFilter, jobTypeFilter, sortBy, selectedBatch]);
+  }, [allJobs, searchQuery, locationFilter, jobTypeFilter, sortBy, selectedBatch, dateFilters]);
 
   // Group jobs by batch for display
   const groupedByBatch = useMemo(() => {
@@ -252,6 +288,23 @@ const ResumeJobs = () => {
             ))}
           </SelectContent>
         </Select>
+
+        {selectedBatch !== 'all' && (
+          <Select
+            value={dateFilters[selectedBatch] ?? 'all'}
+            onValueChange={(value) => handleDateFilterChange(selectedBatch, value as DateFilterValue)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Posted Date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All jobs</SelectItem>
+              <SelectItem value="24h">Last 24 hours</SelectItem>
+              <SelectItem value="3d">Last 3 days</SelectItem>
+              <SelectItem value="older">More than 3 days</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Sort */}
@@ -278,14 +331,14 @@ const ResumeJobs = () => {
       ) : selectedBatch === 'all' && resumeData.batches.length > 1 ? (
         // Group by batch when showing all
         <div className="space-y-8">
-          {sortedBatches
-            .filter(batch => groupedByBatch[batch.batchId]?.length > 0)
-            .map((batch, index) => {
-              const batchJobs = groupedByBatch[batch.batchId];
-              return (
-                <div key={batch.batchId} className="space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b-2 border-primary/20">
-                    <div className="flex items-center gap-3">
+          {sortedBatches.map((batch, index) => {
+            const filteredBatchJobs = groupedByBatch[batch.batchId] ?? [];
+            const batchFilterValue = dateFilters[batch.batchId] ?? 'all';
+
+            return (
+              <div key={batch.batchId} className="space-y-4">
+                <div className="flex flex-col gap-3 pb-3 border-b-2 border-primary/20 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <Badge variant={index === 0 ? 'default' : 'secondary'} className="text-sm">
                         {index === 0 ? '🆕 Latest' : `Extraction ${sortedBatches.length - index}`}
                       </Badge>
@@ -305,32 +358,60 @@ const ResumeJobs = () => {
                         </span>
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        • {batchJobs.length} jobs
+                        • {filteredBatchJobs.length} job{filteredBatchJobs.length === 1 ? '' : 's'}
                       </span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="hover:bg-destructive hover:text-destructive-foreground transition-colors border-destructive/30"
-                      onClick={() => openDeleteExtractionDialog(batch)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Extraction
-                    </Button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select
+                        value={batchFilterValue}
+                        onValueChange={(value) => handleDateFilterChange(batch.batchId, value as DateFilterValue)}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Posted Date" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All jobs</SelectItem>
+                          <SelectItem value="24h">Last 24 hours</SelectItem>
+                          <SelectItem value="3d">Last 3 days</SelectItem>
+                          <SelectItem value="older">More than 3 days</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="hover:bg-destructive hover:text-destructive-foreground transition-colors border-destructive/30"
+                        onClick={() => openDeleteExtractionDialog(batch)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Extraction
+                      </Button>
+                    </div>
                   </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {batchJobs.map((job) => (
-                      <JobCard 
-                        key={`${job.job_id}-${job.batchId}`} 
-                        job={job} 
-                        showMatchScore 
-                        onCardClick={(j) => { setSelectedJob(j); setDetailOpen(true); }}
-                      />
-                    ))}
-                  </div>
+                  {filteredBatchJobs.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-muted p-6 text-center text-sm text-muted-foreground">
+                      No jobs in this extraction match the selected filters for posted date.
+                    </div>
+                  ) : (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {filteredBatchJobs.map((job) => (
+                        <JobCard 
+                          key={`${job.job_id}-${job.batchId}`} 
+                          job={job} 
+                          showMatchScore 
+                          resumeContext={{
+                            resumeId: job.resumeId ?? resume.id,
+                            resumeFilename: job.resumeFilename ?? resume.filename,
+                            batchId: job.batchId,
+                            extractionDate: job.extractionDate,
+                          }}
+                          onCardClick={(j) => { setSelectedJob(j); setDetailOpen(true); }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+            );
+          })}
         </div>
       ) : (
         // Simple grid when filtering by single batch
@@ -340,6 +421,12 @@ const ResumeJobs = () => {
               key={`${job.job_id}-${job.batchId}`} 
               job={job} 
               showMatchScore 
+              resumeContext={{
+                resumeId: job.resumeId ?? resume.id,
+                resumeFilename: job.resumeFilename ?? resume.filename,
+                batchId: job.batchId,
+                extractionDate: job.extractionDate,
+              }}
               onCardClick={(j) => { setSelectedJob(j); setDetailOpen(true); }}
             />
           ))}

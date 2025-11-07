@@ -73,9 +73,13 @@ const ResumeUpload = () => {
       const savedResume = saveResume(file.name, fileUrl, fileBase64);
       
       // Save matched jobs with resume ID
-      saveMatchedJobs(jobs, savedResume.id);
+      saveMatchedJobs(jobs, savedResume.id, savedResume.filename);
       
-      toast.success(`Found ${jobs.length} matching jobs!`);
+      if (jobs.length === 0) {
+        toast.info('No jobs found for this resume yet. We will keep an eye out for matches.');
+      } else {
+        toast.success(`Found ${jobs.length} matching jobs!`);
+      }
       
       // Redirect to dashboard
       setTimeout(() => {
@@ -108,8 +112,12 @@ const ResumeUpload = () => {
       }
       if (!fileToProcess) throw new Error('Could not load saved resume');
       const jobs = await uploadResumeAndMatchJobs(fileToProcess);
-      saveMatchedJobs(jobs, resume.id);
-      toast.success(`Found ${jobs.length} matching jobs!`);
+      saveMatchedJobs(jobs, resume.id, resume.filename);
+      if (jobs.length === 0) {
+        toast.info('No jobs found for this resume yet. We will keep an eye out for matches.');
+      } else {
+        toast.success(`Found ${jobs.length} matching jobs!`);
+      }
       setTimeout(() => {
         navigate('/dashboard/resumes');
       }, 1200);

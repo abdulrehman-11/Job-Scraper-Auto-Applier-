@@ -90,14 +90,31 @@ export async function uploadResumeAndMatchJobs(file: File): Promise<Job[]> {
       }
     }
     
-    throw new Error('Unexpected response format from backend');
+    console.warn('Unexpected response format from backend. Returning empty job list.');
+    return [];
   } catch (error) {
     console.error('Error matching resume to jobs:', error);
     throw error;
   }
 }
 
-export function saveJobToLocalStorage(job: Job) {
+export type AppliedJob = Job & {
+  appliedAt: string;
+  resumeId?: string;
+  resumeFilename?: string;
+  batchId?: string;
+  extractionDate?: string;
+};
+
+export function saveJobToLocalStorage(
+  job: Job,
+  context?: {
+    resumeId?: string;
+    resumeFilename?: string;
+    batchId?: string;
+    extractionDate?: string;
+  }
+) {
   const appliedJobs = getAppliedJobsFromLocalStorage();
   const exists = appliedJobs.some(j => j.job_id === job.job_id);
   
@@ -105,17 +122,21 @@ export function saveJobToLocalStorage(job: Job) {
     appliedJobs.push({
       ...job,
       appliedAt: new Date().toISOString(),
+      resumeId: context?.resumeId ?? job.resumeId,
+      resumeFilename: context?.resumeFilename ?? job.resumeFilename,
+      batchId: context?.batchId ?? job.batchId,
+      extractionDate: context?.extractionDate ?? job.extractionDate,
     });
     localStorage.setItem('appliedJobs', JSON.stringify(appliedJobs));
   }
 }
 
-export function getAppliedJobsFromLocalStorage(): (Job & { appliedAt: string })[] {
+export function getAppliedJobsFromLocalStorage(): AppliedJob[] {
   const stored = localStorage.getItem('appliedJobs');
   return stored ? JSON.parse(stored) : [];
 }
 
-export function saveMatchedJobs(jobs: Job[], resumeId: string) {
+export function saveMatchedJobs(jobs: Job[], resumeId: string, resumeFilename: string) {
   console.log('Saving jobs:', jobs.length, 'for resume:', resumeId);
   const allJobsByResume = getAllJobsByResume();
   const batchId = Date.now().toString();
@@ -129,7 +150,13 @@ export function saveMatchedJobs(jobs: Job[], resumeId: string) {
   batches.push({
     batchId,
     extractionDate,
-    jobs,
+    jobs: jobs.map(job => ({
+      ...job,
+      resumeId,
+      resumeFilename,
+      batchId,
+      extractionDate,
+    })),
   });
   
   allJobsByResume[resumeId] = {
