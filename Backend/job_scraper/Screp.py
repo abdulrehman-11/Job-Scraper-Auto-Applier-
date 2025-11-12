@@ -332,7 +332,7 @@ class JobScraper:
                     
                     for page_num in range(1, max_pages + 1):
                         try:
-                            await page.wait_for_selector('h2[data-testid="searchSerpJobTitle"]', timeout=30000)
+                            await page.wait_for_selector('h2[data-testid="searchSerpJobTitle"]', timeout=1800000)
                             await asyncio.sleep(2)
         
                             # CLOSE POPUP IF IT APPEARS
@@ -567,7 +567,7 @@ class JobScraper:
                         loads += 1
                         
                         try:
-                            await page.wait_for_selector('li[data-test="jobListing"]', timeout=30000)
+                            await page.wait_for_selector('li[data-test="jobListing"]', timeout=1800000)
                             await asyncio.sleep(2)
                         except:
                             print(f"  ⚠️ No job listings found")
@@ -691,7 +691,7 @@ class JobScraper:
                     
                     for page_num in range(1, max_pages + 1):
                         try:
-                            await page.wait_for_selector('section[data-testid^="jobcard-container"]', timeout=30000)
+                            await page.wait_for_selector('section[data-testid^="jobcard-container"]', timeout=1800000)
                             await asyncio.sleep(2)
                             
                             job_cards = await page.query_selector_all('section[data-testid^="jobcard-container"]')
