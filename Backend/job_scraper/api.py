@@ -6,6 +6,7 @@ Synchronous endpoint that returns scraped jobs in n8n format
 import asyncio
 import json
 import logging
+import os
 import time
 from datetime import datetime
 from threading import Thread
@@ -15,6 +16,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 from Screp import JobScraper
+
+# Set Playwright browser path BEFORE any imports
+os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.getenv(
+    'PLAYWRIGHT_BROWSERS_PATH', 
+    '/opt/render/project/src/browsers'
+)
 
 # Configure logging
 logging.basicConfig(
@@ -223,13 +230,62 @@ async def run_scraper(
         raise
 
 
+def check_browser_installation():
+    """Check if Playwright browser is installed"""
+    import subprocess
+    try:
+        browser_path = os.getenv('PLAYWRIGHT_BROWSERS_PATH', '/opt/render/project/src/browsers')
+        
+        # Check if browser directory exists
+        if os.path.exists(browser_path):
+            return {
+                'available': True,
+                'path': browser_path,
+                'message': 'Browser directory found'
+            }
+        
+        # Try to check with playwright
+        result = subprocess.run(
+            ['playwright', 'install', '--dry-run', 'chromium'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if 'already installed' in result.stdout.lower() or result.returncode == 0:
+            return {
+                'available': True,
+                'path': browser_path,
+                'message': 'Browser appears to be installed'
+            }
+        
+        return {
+            'available': False,
+            'path': browser_path,
+            'message': 'Browser not found'
+        }
+    except Exception as e:
+        return {
+            'available': False,
+            'path': 'unknown',
+            'message': f'Error checking browser: {str(e)}'
+        }
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for Render"""
+    """Health check endpoint for Render with browser verification"""
+    browser_status = check_browser_installation()
+    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'scraping_status': scraping_progress['status']
+        'scraping_status': scraping_progress['status'],
+        'browser': browser_status,
+        'environment': {
+            'playwright_path': os.getenv('PLAYWRIGHT_BROWSERS_PATH', 'not set'),
+            'python_version': os.sys.version.split()[0]
+        }
     }), 200
 
 

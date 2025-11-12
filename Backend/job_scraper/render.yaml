@@ -20,6 +20,8 @@ services:
       - key: MAX_PAGES_PER_KEYWORD
         value: 3
       - key: PLAYWRIGHT_BROWSERS_PATH
-        value: /opt/render/project/.cache/ms-playwright
+        value: /opt/render/project/src/browsers
+      - key: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+        value: "0"
       - key: PORT
         generateValue: true
