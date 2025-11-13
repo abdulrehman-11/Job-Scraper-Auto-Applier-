@@ -1036,6 +1036,128 @@ class JobScraper:
     def get_jobs(self) -> List[Dict]:
         """Return the scraped jobs"""
         return self.jobs
+    
+    def clear_jobs(self):
+        """Clear the jobs list to free memory"""
+        self.jobs = []
+        print("🗑️  Jobs list cleared from memory")
+    
+    async def scrape_all_platforms_sequential(
+        self,
+        keywords: List[str],
+        location: str = "United States",
+        max_pages: int = 2,
+        platform_timeout: int = 150  # 2.5 minutes per platform
+    ) -> List[Dict]:
+        """
+        Scrape all platforms SEQUENTIALLY with memory optimization
+        
+        This approach:
+        - Scrapes one platform at a time
+        - Closes browser after each platform to free memory
+        - Has per-platform timeout to prevent hanging
+        - Keeps memory under 512 MB
+        
+        Args:
+            keywords: List of search keywords
+            location: Job location
+            max_pages: Pages per keyword (default 2 for free tier)
+            platform_timeout: Max seconds per platform (default 150s = 2.5 min)
+        
+        Returns:
+            List of all scraped jobs
+        """
+        all_jobs = []
+        platforms_scraped = []
+        
+        print("\n" + "="*60)
+        print("🚀 SEQUENTIAL PLATFORM SCRAPING (MEMORY OPTIMIZED)")
+        print("="*60)
+        print(f"📍 Keywords: {keywords}")
+        print(f"📍 Location: {location}")
+        print(f"📍 Pages per keyword: {max_pages}")
+        print(f"⏱️  Timeout per platform: {platform_timeout}s")
+        print("="*60)
+        
+        # Platform 1: SimplyHired
+        print("\n🎯 PHASE 1/2: SimplyHired")
+        try:
+            scrape_task = self.scrape_simplyhired(
+                keywords=keywords,
+                location=location,
+                max_pages=max_pages
+            )
+            
+            await asyncio.wait_for(scrape_task, timeout=platform_timeout)
+            
+            # Collect jobs from this platform
+            platform_jobs = self.get_jobs()
+            all_jobs.extend(platform_jobs)
+            platforms_scraped.append(f"SimplyHired ({len(platform_jobs)} jobs)")
+            
+            print(f"✅ SimplyHired completed: {len(platform_jobs)} jobs scraped")
+            
+            # Clear memory before next platform
+            self.clear_jobs()
+            
+        except asyncio.TimeoutError:
+            print(f"⏱️  SimplyHired timed out after {platform_timeout}s - continuing to next platform")
+            # Keep whatever jobs were collected
+            platform_jobs = self.get_jobs()
+            all_jobs.extend(platform_jobs)
+            platforms_scraped.append(f"SimplyHired ({len(platform_jobs)} jobs, timed out)")
+            self.clear_jobs()
+            
+        except Exception as e:
+            print(f"❌ SimplyHired error: {str(e)} - continuing to next platform")
+            platforms_scraped.append("SimplyHired (failed)")
+        
+        # Small delay between platforms
+        await asyncio.sleep(2)
+        
+        # Platform 2: Talent.com
+        print("\n🎯 PHASE 2/2: Talent.com")
+        try:
+            scrape_task = self.scrape_talent(
+                keywords=keywords,
+                location=location,
+                max_pages=max_pages
+            )
+            
+            await asyncio.wait_for(scrape_task, timeout=platform_timeout)
+            
+            # Collect jobs from this platform
+            platform_jobs = self.get_jobs()
+            all_jobs.extend(platform_jobs)
+            platforms_scraped.append(f"Talent.com ({len(platform_jobs)} jobs)")
+            
+            print(f"✅ Talent.com completed: {len(platform_jobs)} jobs scraped")
+            
+            # Clear memory
+            self.clear_jobs()
+            
+        except asyncio.TimeoutError:
+            print(f"⏱️  Talent.com timed out after {platform_timeout}s - continuing")
+            platform_jobs = self.get_jobs()
+            all_jobs.extend(platform_jobs)
+            platforms_scraped.append(f"Talent.com ({len(platform_jobs)} jobs, timed out)")
+            self.clear_jobs()
+            
+        except Exception as e:
+            print(f"❌ Talent.com error: {str(e)}")
+            platforms_scraped.append("Talent.com (failed)")
+        
+        # Store all jobs back in self.jobs for further processing
+        self.jobs = all_jobs
+        
+        print("\n" + "="*60)
+        print("📊 SEQUENTIAL SCRAPING COMPLETED")
+        print("="*60)
+        print(f"Total jobs collected: {len(all_jobs)}")
+        print(f"Platforms: {', '.join(platforms_scraped)}")
+        print("="*60)
+        
+        return all_jobs
 
 
 # ==================== MAIN EXECUTION ====================

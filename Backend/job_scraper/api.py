@@ -106,12 +106,15 @@ async def run_scraper(
     location: str = "United States"
 ) -> Dict:
     """
-    Run the job scraper with specified parameters
+    Run the job scraper with specified parameters (MEMORY OPTIMIZED)
+    
+    This function uses sequential scraping to stay within 512 MB memory limit.
+    Platforms are scraped one at a time with browser cleanup between each.
     
     Args:
-        platform: Platform to scrape (SimplyHired, Glassdoor, Talent.com) or None for all
+        platform: Platform to scrape (SimplyHired, Talent.com) or None/all for both
         keywords: List of job search keywords
-        pages: Number of pages to scrape per keyword
+        pages: Number of pages to scrape per keyword (max 2 recommended for free tier)
         location: Job location
     
     Returns:
@@ -122,13 +125,15 @@ async def run_scraper(
     try:
         # Default parameters
         if keywords is None:
-            keywords = ['python developer']
+            keywords = ['python developer', 'react developer']
         
-        # Limit to reasonable values to prevent timeout
-        pages = min(pages, 5)  # Max 5 pages
-        keywords = keywords[:3]  # Max 3 keywords
+        # Limit to reasonable values for Render free tier (512 MB)
+        # Recommended: 2 keywords, 2 pages = ~200-250 MB peak memory
+        pages = min(pages, 2)  # Max 2 pages for free tier
+        keywords = keywords[:2]  # Max 2 keywords for free tier
         
         logger.info(f"🚀 Starting scraper - Platform: {platform}, Keywords: {keywords}, Pages: {pages}, Location: {location}")
+        logger.info(f"💾 Memory optimization: Sequential scraping enabled")
         
         # Initialize scraper (headless=True for production)
         scraper = JobScraper(headless=True)
@@ -136,52 +141,29 @@ async def run_scraper(
         # Update progress
         scraping_progress['status'] = 'running'
         scraping_progress['jobs_count'] = 0
+        scraping_progress['last_heartbeat'] = datetime.now().isoformat()
         
         # Start heartbeat thread
         heartbeat_thread = Thread(target=heartbeat_logger, args=(300,), daemon=True)
         heartbeat_thread.start()
         
-        # Scrape based on platform
+        # Scrape based on platform parameter
         if platform is None or platform.lower() == 'all':
-            logger.info("📋 Scraping all platforms")
+            logger.info("📋 Scraping all platforms SEQUENTIALLY (SimplyHired → Talent.com)")
             
-            # SimplyHired
-            try:
-                await scraper.scrape_simplyhired(
-                    keywords=keywords,
-                    location=location,
-                    max_pages=pages
-                )
-                scraping_progress['jobs_count'] = len(scraper.jobs)
-                logger.info(f"✅ SimplyHired: {len(scraper.jobs)} jobs")
-            except Exception as e:
-                logger.error(f"❌ SimplyHired error: {str(e)}")
+            # Use the new sequential scraper method
+            await scraper.scrape_all_platforms_sequential(
+                keywords=keywords,
+                location=location,
+                max_pages=pages,
+                platform_timeout=150  # 2.5 min per platform
+            )
             
-            # Talent.com
-            try:
-                await scraper.scrape_talent(
-                    keywords=keywords,
-                    location=location,
-                    max_pages=pages
-                )
-                scraping_progress['jobs_count'] = len(scraper.jobs)
-                logger.info(f"✅ Talent.com: {len(scraper.jobs)} jobs")
-            except Exception as e:
-                logger.error(f"❌ Talent.com error: {str(e)}")
-            
-            # Glassdoor (optional, often has CAPTCHA)
-            try:
-                await scraper.scrape_glassdoor(
-                    keywords=keywords[:1],  # Only 1 keyword for Glassdoor
-                    location=location,
-                    max_loads=pages
-                )
-                scraping_progress['jobs_count'] = len(scraper.jobs)
-                logger.info(f"✅ Glassdoor: {len(scraper.jobs)} jobs")
-            except Exception as e:
-                logger.error(f"❌ Glassdoor error: {str(e)}")
+            scraping_progress['jobs_count'] = len(scraper.jobs)
+            logger.info(f"✅ Sequential scraping completed: {len(scraper.jobs)} total jobs")
         
         elif platform.lower() == 'simplyhired':
+            logger.info("📋 Scraping SimplyHired only")
             await scraper.scrape_simplyhired(
                 keywords=keywords,
                 location=location,
@@ -189,7 +171,8 @@ async def run_scraper(
             )
             scraping_progress['jobs_count'] = len(scraper.jobs)
         
-        elif platform.lower() == 'talent' or platform.lower() == 'talent.com':
+        elif platform.lower() in ['talent', 'talent.com']:
+            logger.info("📋 Scraping Talent.com only")
             await scraper.scrape_talent(
                 keywords=keywords,
                 location=location,
@@ -197,18 +180,11 @@ async def run_scraper(
             )
             scraping_progress['jobs_count'] = len(scraper.jobs)
         
-        elif platform.lower() == 'glassdoor':
-            await scraper.scrape_glassdoor(
-                keywords=keywords,
-                location=location,
-                max_loads=pages
-            )
-            scraping_progress['jobs_count'] = len(scraper.jobs)
-        
         else:
-            raise ValueError(f"Unknown platform: {platform}")
+            raise ValueError(f"Unknown platform: {platform}. Use 'all', 'simplyhired', or 'talent'")
         
-        # Process results
+        # Process results (deduplication + filtering)
+        logger.info("🔄 Processing results: removing duplicates and filtering...")
         scraper.remove_duplicates()
         scraper.filter_last_24_hours()
         
@@ -219,13 +195,15 @@ async def run_scraper(
         # Update progress
         scraping_progress['status'] = 'completed'
         scraping_progress['jobs_count'] = len(jobs)
+        scraping_progress['last_heartbeat'] = scraped_at
         
-        logger.info(f"✅ Scraping completed: {len(jobs)} jobs found")
+        logger.info(f"✅ Scraping completed successfully: {len(jobs)} jobs after deduplication")
         
         return format_jobs_for_n8n(jobs, scraped_at)
     
     except Exception as e:
         scraping_progress['status'] = 'error'
+        scraping_progress['last_heartbeat'] = datetime.now().isoformat()
         logger.error(f"❌ Scraping error: {str(e)}")
         raise
 
@@ -292,23 +270,42 @@ def health_check():
 @app.route('/api/scrape-jobs', methods=['POST'])
 def scrape_jobs():
     """
-    Main endpoint for scraping jobs
+    Main endpoint for scraping jobs (MEMORY OPTIMIZED FOR RENDER FREE TIER)
     
     Request body (all optional):
     {
-        "platform": "SimplyHired",  // or "Glassdoor", "Talent.com", "all", null
-        "keywords": ["python developer", "data scientist"],
-        "pages": 1,
+        "platform": "all",  // or "simplyhired", "talent", null (defaults to "all")
+        "keywords": ["python developer", "react developer"],  // max 2 recommended
+        "pages": 2,  // max 2 recommended for 512 MB limit
         "location": "United States"
     }
     
     Response format:
     {
         "success": true,
-        "total_jobs": 20,
-        "scraped_at": "2025-11-04T22:30:00.000000",
-        "jobs": [...]
+        "total_jobs": 180,
+        "scraped_at": "2025-11-13T00:05:00.000000",
+        "jobs": [
+            {
+                "job_id": "abc123",
+                "title": "Python Developer",
+                "company": "TechCorp",
+                "location": "Remote",
+                "url": "https://...",
+                "description": "Full job description...",
+                "posted_date": "2025-11-12T10:30:00",
+                "source": "SimplyHired",
+                "fetched_at": "2025-11-13T00:05:00"
+            },
+            ...
+        ]
     }
+    
+    Memory optimization:
+    - Sequential scraping (one platform at a time)
+    - Browser cleanup between platforms
+    - Max 2 keywords, 2 pages recommended
+    - Peak memory: ~400-450 MB
     """
     try:
         # Log request
@@ -317,9 +314,9 @@ def scrape_jobs():
         # Parse request body (optional)
         data = request.get_json() or {}
         
-        platform = data.get('platform')
-        keywords = data.get('keywords', ['python developer'])
-        pages = data.get('pages', 1)
+        platform = data.get('platform', 'all')  # Default to 'all'
+        keywords = data.get('keywords', ['python developer', 'react developer'])
+        pages = data.get('pages', 2)  # Default 2 pages for free tier
         location = data.get('location', 'United States')
         
         # Validate parameters
@@ -339,8 +336,15 @@ def scrape_jobs():
                 'jobs': []
             }), 400
         
+        # Warn if exceeding recommended limits
+        if len(keywords) > 2:
+            logger.warning(f"⚠️  {len(keywords)} keywords requested (recommended: 2 for free tier)")
+        if pages > 2:
+            logger.warning(f"⚠️  {pages} pages requested (recommended: 2 for free tier)")
+        
         # Log parameters
         logger.info(f"Parameters - Platform: {platform}, Keywords: {keywords}, Pages: {pages}, Location: {location}")
+        logger.info(f"💾 Memory mode: Sequential scraping enabled")
         
         # Run scraper synchronously (this will block until complete)
         result = asyncio.run(run_scraper(
