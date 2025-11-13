@@ -18,25 +18,10 @@ from flask_cors import CORS
 from Screp import JobScraper
 
 # Set Playwright browser path BEFORE any imports
-# Support multiple deployment platforms (DigitalOcean, Render, Docker, etc.)
-DEFAULT_BROWSER_PATHS = [
-    '/ms-playwright',  # Docker container default
-    '/opt/render/project/src/browsers',  # Render.com
-    '/home/app/browsers',  # DigitalOcean custom
-    os.path.expanduser('~/.cache/ms-playwright'),  # Local fallback
-]
-
-# Use environment variable or detect available path
-playwright_browser_path = os.getenv('PLAYWRIGHT_BROWSERS_PATH')
-if not playwright_browser_path:
-    for path in DEFAULT_BROWSER_PATHS:
-        if os.path.exists(path):
-            playwright_browser_path = path
-            break
-    if not playwright_browser_path:
-        playwright_browser_path = DEFAULT_BROWSER_PATHS[0]  # Default to Docker path
-
-os.environ['PLAYWRIGHT_BROWSERS_PATH'] = playwright_browser_path
+os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.getenv(
+    'PLAYWRIGHT_BROWSERS_PATH', 
+    '/opt/render/project/src/browsers'
+)
 
 # Configure logging
 logging.basicConfig(
@@ -184,18 +169,17 @@ async def run_scraper(
             except Exception as e:
                 logger.error(f"❌ Talent.com error: {str(e)}")
             
-            # Glassdoor - DISABLED (uncomment to enable)
-            # Note: Glassdoor often has CAPTCHA issues in headless mode
-            # try:
-            #     await scraper.scrape_glassdoor(
-            #         keywords=keywords[:1],  # Only 1 keyword for Glassdoor
-            #         location=location,
-            #         max_loads=pages
-            #     )
-            #     scraping_progress['jobs_count'] = len(scraper.jobs)
-            #     logger.info(f"✅ Glassdoor: {len(scraper.jobs)} jobs")
-            # except Exception as e:
-            #     logger.error(f"❌ Glassdoor error: {str(e)}")
+            # Glassdoor (optional, often has CAPTCHA)
+            try:
+                await scraper.scrape_glassdoor(
+                    keywords=keywords[:1],  # Only 1 keyword for Glassdoor
+                    location=location,
+                    max_loads=pages
+                )
+                scraping_progress['jobs_count'] = len(scraper.jobs)
+                logger.info(f"✅ Glassdoor: {len(scraper.jobs)} jobs")
+            except Exception as e:
+                logger.error(f"❌ Glassdoor error: {str(e)}")
         
         elif platform.lower() == 'simplyhired':
             await scraper.scrape_simplyhired(
@@ -247,29 +231,20 @@ async def run_scraper(
 
 
 def check_browser_installation():
-    """Check if Playwright browser is installed - platform agnostic"""
+    """Check if Playwright browser is installed"""
     import subprocess
     try:
-        # Get the configured browser path
-        browser_path = os.getenv('PLAYWRIGHT_BROWSERS_PATH', '/ms-playwright')
+        browser_path = os.getenv('PLAYWRIGHT_BROWSERS_PATH', '/opt/render/project/src/browsers')
         
         # Check if browser directory exists
         if os.path.exists(browser_path):
-            # Check for chromium specifically
-            chromium_dirs = [
-                os.path.join(browser_path, 'chromium-*'),
-                os.path.join(browser_path, 'chrome-*'),
-            ]
-            import glob
-            for pattern in chromium_dirs:
-                if glob.glob(pattern):
-                    return {
-                        'available': True,
-                        'path': browser_path,
-                        'message': 'Chromium browser found'
-                    }
+            return {
+                'available': True,
+                'path': browser_path,
+                'message': 'Browser directory found'
+            }
         
-        # Try to check with playwright command
+        # Try to check with playwright
         result = subprocess.run(
             ['playwright', 'install', '--dry-run', 'chromium'],
             capture_output=True,
@@ -287,19 +262,19 @@ def check_browser_installation():
         return {
             'available': False,
             'path': browser_path,
-            'message': 'Browser not found - may need installation'
+            'message': 'Browser not found'
         }
     except Exception as e:
         return {
             'available': False,
-            'path': browser_path if 'browser_path' in locals() else 'unknown',
+            'path': 'unknown',
             'message': f'Error checking browser: {str(e)}'
         }
 
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint with browser verification - platform agnostic"""
+    """Health check endpoint for Render with browser verification"""
     browser_status = check_browser_installation()
     
     return jsonify({
@@ -309,9 +284,7 @@ def health_check():
         'browser': browser_status,
         'environment': {
             'playwright_path': os.getenv('PLAYWRIGHT_BROWSERS_PATH', 'not set'),
-            'python_version': os.sys.version.split()[0],
-            'platform': 'DigitalOcean' if os.getenv('DIGITALOCEAN') else 'Generic',
-            'port': os.getenv('PORT', '8080')
+            'python_version': os.sys.version.split()[0]
         }
     }), 200
 
