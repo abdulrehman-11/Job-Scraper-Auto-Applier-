@@ -135,8 +135,15 @@ async def run_scraper(
         logger.info(f"🚀 Starting scraper - Platform: {platform}, Keywords: {keywords}, Pages: {pages}, Location: {location}")
         logger.info(f"💾 Memory optimization: Sequential scraping enabled")
         
-        # Initialize scraper (headless=True for production)
-        scraper = JobScraper(headless=True)
+        # Initialize scraper (headless=True for production, False for local debugging)
+        # Set DEBUG=true in environment to see browser window
+        is_debug = os.getenv('DEBUG', 'false').lower() == 'true'
+        headless_mode = not is_debug  # If DEBUG=true, headless=False (visible browser)
+        
+        if is_debug:
+            logger.info("🐛 DEBUG mode: Browser will be VISIBLE")
+        
+        scraper = JobScraper(headless=headless_mode)
         
         # Update progress
         scraping_progress['status'] = 'running'
@@ -405,6 +412,20 @@ if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    
+    # Check browser installation on startup
+    logger.info("🔍 Checking browser installation...")
+    browser_status = check_browser_installation()
+    if browser_status.get('chromium'):
+        logger.info("✅ Chromium browser ready")
+    else:
+        logger.warning("⚠️  Chromium not found - scraping may fail!")
+        logger.info("Run: playwright install chromium")
+    
+    logger.info(f"🚀 Starting Flask server on port {port}")
+    logger.info(f"📍 API endpoint: http://localhost:{port}/api/scrape-jobs")
+    logger.info(f"💡 Test with: curl -X POST http://localhost:{port}/api/scrape-jobs -H 'Content-Type: application/json' -d '{{\"keywords\":[\"python\"],\"pages\":1}}'")
+    
     
     logger.info(f"🚀 Starting Job Scraper API on port {port}")
     app.run(host='0.0.0.0', port=port, debug=debug)
