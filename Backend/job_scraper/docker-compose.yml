@@ -1,0 +1,57 @@
+services:
+  job-scraper-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: job-scraper-api
+    ports:
+      - "8080:8080"
+    environment:
+      # Flask Configuration
+      - PORT=8080
+      - DEBUG=False
+      - HOST=0.0.0.0
+      
+      # Scraper Configuration
+      - HEADLESS_MODE=True
+      - MAX_PAGES_PER_KEYWORD=3
+      - MAX_JOBS_GLASSDOOR=20
+      - DEFAULT_LOCATION=United States
+      
+      # Playwright Configuration
+      - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+      
+      # Logging
+      - LOG_LEVEL=INFO
+      
+      # Performance Settings
+      - GUNICORN_WORKERS=1
+      - GUNICORN_THREADS=2
+      - GUNICORN_TIMEOUT=600
+      
+      # Platform
+      - PLATFORM=Docker
+    volumes:
+      # Optional: Mount logs directory for persistence
+      - ./logs:/app/logs
+      # Optional: Mount output directory for job results
+      - ./output:/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - job-scraper-network
+
+networks:
+  job-scraper-network:
+    driver: bridge
+
+# Usage:
+# Build and start: docker-compose up -d --build
+# View logs: docker-compose logs -f
+# Stop: docker-compose down
+# Test API: curl http://localhost:8080/health
